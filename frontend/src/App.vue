@@ -1,20 +1,28 @@
 <template>
-  <div class="barcode_app" :class="[state]">
-    <h1>Scan a Barcode</h1>
+  <div class="barcode_app" :class="[state]" @focus="ensureFocus()" tabindex="-1">
+    <h1>{{ stateText }}</h1>
     <input ref="barcode_el" type="text" class="barcode_reader" @change="barcodeScanned" autofocus>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 const barcode_el = ref(null);
 
 const state = ref('UNSCANNED');
 
-function barcodeScanned() {
+const stateText = computed(() => {
+  if (state.value === 'APPROVED') return '✔ Approved';
+  else if (state.value === 'DENIED') return '✗ Denied';
+
+  return '(Scan a CAC)';
+});
+
+async function barcodeScanned() {
 
   const barcode_raw = barcode_el.value.value;
+  barcode_el.value.value = "";
   const barcode = (barcode_raw.length === 18) ? {
     "version" : barcode_raw[0],
     "CSI" : parseInt(barcode_raw.slice(1,7), 32),
@@ -39,10 +47,14 @@ function barcodeScanned() {
 
   console.log("DOD_ID", barcode.DOD_ID);
 
-  state.value = "SUCCESS";
-  setTimeout(() => state.value = "UNSCANNED", 1000);
+  // const res = await fetch('/api/can_i_has');
+  const res = { ok: true }
+  state.value = res.ok ? 'APPROVED' : 'DENIED';
+  setTimeout(() => state.value = 'UNSCANNED', 1000);
+}
 
-  barcode_el.value.value = "";
+function ensureFocus() {
+  barcode_el.value.focus();
 }
 
 </script>
@@ -55,7 +67,8 @@ body {
 
 h1 {
   font-family: 'Montserrat';
-  text-align: center;
+  font-size: 2em;
+  margin-left: .5em;
 }
 
 div.barcode_app {
@@ -63,10 +76,6 @@ div.barcode_app {
   width: 100vw;
 
   padding-top: 2em;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
 
   &.UNSCANNED {
     background-color: #333;
@@ -76,11 +85,19 @@ div.barcode_app {
     }
   }
 
-  &.SUCCESS {
+  &.APPROVED {
     background-color: #030;
 
     h1 {
       color: #2e0;
+    }
+  }
+
+  &.DENIED {
+    background-color: #300;
+
+    h1 {
+      color: #e02;
     }
   }
 
@@ -90,8 +107,4 @@ div.barcode_app {
   }
 }
 
-input.barcode_reader {
-  width: 100%;
-  height: 3em;
-}
 </style>
