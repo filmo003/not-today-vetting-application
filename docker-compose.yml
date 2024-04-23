@@ -27,3 +27,4 @@ services:
 secrets:
   JIRA_API_TOKEN:
     external: true
+    name: JIRA_API_TOKEN

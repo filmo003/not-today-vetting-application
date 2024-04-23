@@ -45,6 +45,8 @@ It is a single form with one text input element. When the user scans a barcode, 
 Once the backend is stood up, the DOD ID can be sent to the backend and either validated or rejected. The entire UX is one button, and the UI turning green or red based.
 
 ## Deployment
-`docker compose up dev-web` deploys the frontend.
+Before running, run `echo "your_jira_api_token" | docker secret create JIRA_API_TOKEN -` this will allow the backend to talk to your Jira instance.
+
+`docker compose up` deploys the web server frontend and backend.
 
 To run it on the scanner, either connect it to a network and open chrome and point it to the IP of the deployment, or connect it via USB-C and open the app through chrome remote debugging.

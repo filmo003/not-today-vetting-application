@@ -21,3 +21,4 @@ Dockerfile
 
 # Ignore any other files or directories specific to your project
 # Add more rules as needed
+jira_secret.txt
