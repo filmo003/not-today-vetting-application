@@ -8,9 +8,34 @@ Front barcode:
 M1E46E0B01I1UJGGGeoffrey            SWelch                     B41TUS ED00      ZZNSZBD0CBE2ATPEAH4
 ```
 
+Parsed:
+```plain
+version: M
+DOD_ID: 1547909131
+UNKNOWN: 01I1UJGG
+first_name: Geoffrey
+m_initial: S
+last_name: Welch
+UNKNOWN: B41TUS ED00      ZZNSZBD0CBE2A
+CSID: 999762468
+
+```
+
 Back barcode:
 ```plain
 1TPEAH4X1E46E0BEDZ
+```
+
+Parsed:
+```plain
+version: 1
+CSID: 999762468
+person_type: X
+DOD_ID: 1547909131
+person_category: E
+branch: D
+card_id: Z
+
 ```
 
 # Frontend
