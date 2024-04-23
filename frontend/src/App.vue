@@ -25,7 +25,7 @@ async function barcodeScanned() {
   barcode_el.value.value = "";
   const barcode = (barcode_raw.length === 18) ? {
     "version" : barcode_raw[0],
-    "CSI" : parseInt(barcode_raw.slice(1,7), 32),
+    "CSID" : parseInt(barcode_raw.slice(1,7), 32),
     "person_type" : barcode_raw[7],
     "DOD_ID" : parseInt(barcode_raw.slice(8,15), 32),
     "person_category" : barcode_raw[15],
@@ -40,8 +40,7 @@ async function barcodeScanned() {
     "m_initial" : barcode_raw[36],
     "last_name" : barcode_raw.slice(37, 63),
     "UNKNOWN" : barcode_raw.slice(63, 93),
-    "CSID" : parseInt(barcode_raw.slice(93, 98)),
-    "UNKNOWN" : barcode_raw[98],
+    "CSID" : parseInt(barcode_raw.slice(93, 99)),
   }
 
 
