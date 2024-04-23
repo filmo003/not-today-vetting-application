@@ -11,3 +11,13 @@ services:
     entrypoint: npm start
     ports:
       - '0.0.0.0:1337:1337'
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - JIRA_BASE_URL=https://jira.truststack.us
+      - JIRA_EMAIL=your-email@example.com
+      - JIRA_API_TOKEN=your-api-token
