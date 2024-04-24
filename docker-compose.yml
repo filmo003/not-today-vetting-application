@@ -17,6 +17,8 @@ services:
     build:
       context: ./backend-nodejs
       dockerfile: backend.dockerfile
+    volumes:
+      - '.:/project'
     ports:
       - "3000:3000"
     secrets:
