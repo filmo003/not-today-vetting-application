@@ -4,10 +4,26 @@ services:
   dev-web:
     build:
       context: .
-      dockerfile: dev.dockerfile
+      dockerfile: ./frontend/dev.dockerfile
     volumes:
       - '.:/project'
     working_dir: /project/frontend
     entrypoint: npm start
     ports:
       - '0.0.0.0:1337:1337'
+    environment:
+      - BACKEND_API=http://backend:3000
+  backend:
+    build:
+      context: ./backend-nodejs
+      dockerfile: backend.dockerfile
+    ports:
+      - "3000:3000"
+    secrets:
+      - JIRA_API_TOKEN
+    environment:
+      - JIRA_BASE_URL=https://jira.truststack.us
+      - JIRA_EMAIL=your-email@example.com
+secrets:
+  JIRA_API_TOKEN:
+    file: ./jira_secret.txt

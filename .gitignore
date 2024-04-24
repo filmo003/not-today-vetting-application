@@ -1,0 +1,24 @@
+# Node.js dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# IDE-specific files
+.vscode/
+.idea/
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Ignore any other files or directories specific to your project
+# Add more rules as needed
+jira_secret.txt
