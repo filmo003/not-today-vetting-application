@@ -14,7 +14,8 @@ app.get('/', (req, res) => {
     res.send('\nHello from the not-today backend!');
 });
 
-app.get('/checkAttendee', (req, res) => {
+app.get('/checkAttendeeSecret', (req, res) => {
+    // check the attendee's edipi against the Jira Asset
     const { edipi } = req.query;
     console.log(`User EDIPI: ${edipi}`);
     if (!edipi) {
@@ -24,21 +25,40 @@ app.get('/checkAttendee', (req, res) => {
         method: 'get',
         maxBodyLength: Infinity,
         url: `https://jira.truststack.us/rest/assets/1.0/aql/objects?objectSchemaId=${objectSchemaId}&qlQuery=EDIPI LIKE "${edipi}"`,
-        headers: { 
-        '': '', 
-        'Authorization': `'Bearer ${JIRA_API_TOKEN}'`, 
+        headers: {  
+            "Authorization" : `Bearer ${JIRA_API_TOKEN}`
         }
     };
     
     axios.request(config)
     .then((response) => {
-        console.log(JSON.stringify(response.data));
+        const responseString = JSON.stringify(response.data);
+        personObject = response.data.objectEntries[0];
+        if (!personObject){
+            console.log("No entry found")
+            res.send("No entry found. Deny");
+            return
+        }
+        // check person's access is at least secret
+        personName = personObject.label;
+        console.log(`Name = ${personName}`);
+        // iterate through attributes to find "access" attribute
+        for (const attribute of personObject.attributes) {
+            if (attribute.id == 414540) { //id of access attribute
+                if (attribute.objectAttributeValues[0].value.includes("Secret")) {
+                    console.log("Correct clearance!");
+                    res.send('\nCorrect Clearance! Admit');
+                    return
+                }
+                res.send('\nIncorrect Clearance, Deny');
+                return
+            }
+        }
+        res.send('something went wrong');
     })
     .catch((error) => {
         console.log(error);
     });
-
-    res.send('\nPlaceholder for now')
 });
 
 app.listen(port, () => {
