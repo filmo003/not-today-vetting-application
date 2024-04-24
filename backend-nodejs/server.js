@@ -11,8 +11,12 @@ app.get('/', (req, res) => {
     res.send('\nHello from the not-today backend!');
 });
 
-app.get("/login", (req, res) => {
-
+app.post("/newMeeting", (req, res) => {
+    const { title } = req.body;
+    const id = Math.random().toString(36); //meeting ID
+    const newMeeting = { id, title, attendees: [] };
+    meetings.push(newMeeting);
+    res.status(201).json(newMeeting);
 });
 
 app.get('/checkAttendee', (req, res) => {

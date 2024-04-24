@@ -11,12 +11,11 @@ module.exports = {
     let config = {
       method: 'get',
       maxBodyLength: Infinity,
-      url: `https://jira.truststack.us/rest/assets/1.0/aql/objects?objectSchemaId=${objectSchemaId}&qlQuery=EDIPI LIKE "${edipi}"`,
+      url: `https://${JIRA_BASE_URL}/rest/assets/1.0/aql/objects?objectSchemaId=${objectSchemaId}&qlQuery=EDIPI LIKE "${edipi}"`,
       headers: {  
           "Authorization" : `Bearer ${JIRA_API_TOKEN}`
       }
     };
-
     axios.request(config)
     .then((response) => {
       const responseString = JSON.stringify(response.data);
@@ -26,7 +25,7 @@ module.exports = {
           res.send("No entry found. Deny");
           return
       }
-      // check person's access is at least secret
+      // check person's access
       personName = personObject.label;
       console.log(`Name = ${personName}`);
       // iterate through attributes to find "access" attribute
