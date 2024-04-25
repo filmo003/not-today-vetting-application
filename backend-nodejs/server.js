@@ -16,12 +16,18 @@ app.get('/', (req, res) => {
 app.post("/newMeeting", (req, res) => {
     // takes in title & classificaiton params and creates new meeting
     // returns unique meeting ID
-    const { title, classLevel } = req.query;
-    const id = Math.floor(Math.random() * 10); //meeting ID
-    console.log(`Creating meeting: ${id}`);
-    const newMeeting = {meetingID:`${id}`, meetingTitle:title, attendees: [], meetingClassification:classLevel};
-    meetings.push(newMeeting);
-    res.status(201).json(newMeeting);
+    try{
+        const { title, classLevel } = req.query;
+        const id = Math.floor(Math.random() * 10); //meeting ID
+        console.log(`Creating meeting: ${id}`);
+        //const newMeeting = {meetingID:`${id}`, meetingTitle:title, attendees: [], meetingClassification:classLevel};
+        helper.createMeeting(id, title, classLevel, res);
+        //meetings.push(newMeeting);
+        //res.status(201).json(newMeeting);
+    }catch (error) {
+        console.error("Error:", error.message);
+        return res.status(500).json({ error: "Internal server error" });
+    }
 });
 
 app.post('/checkAttendee', async (req, res) => {
@@ -34,34 +40,23 @@ app.post('/checkAttendee', async (req, res) => {
         if (!edipi) {
             return res.status(400).json({ error: "Missing parameter" });
         }
-        for (const meeting of meetings) {
-            if (meeting.meetingID === meetingID) {
-                console.log("Meeting match found");
-                const result = await helper.checkClearance(edipi, meeting, res);
-                console.log(result);
-                if (result) {
-                    console.log(`Adding user ${edipi} to meeting ID: ${meetingID}`);
-                    meeting.attendees.push(edipi);
-                    return
-                }
-                else {
-                    console.log("Deny statement sent in response");
-                    return
-                }
-            }
-        }
-        return res.status(400).json({ error: "Meeting does not exist" });
+        helper.checkClearance(edipi, meetingID, res);
     } catch (error) {
         console.error("Error:", error.message);
         return res.status(500).json({ error: "Internal server error" });
     }
 });
 
+app.get('/meetingWithID', (req, res) => {
+    const { meetingID } = req.query;
+    helper.getMeetingWithID(res);
+});
 
 app.get('/meetings', (req, res) => {
     // GETs all meetings
-    console.log(meetings);
-    res.send(meetings);
+    //console.log(meetings);
+    //res.send(meetings);
+    helper.getMeetings(res);
 });
 
 app.listen(port, () => {
