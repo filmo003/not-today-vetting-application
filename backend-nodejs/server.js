@@ -14,6 +14,8 @@ app.get('/', (req, res) => {
 });
 
 app.post("/newMeeting", (req, res) => {
+    // takes in title & classificaiton params and creates new meeting
+    // returns unique meeting ID
     const { title, classLevel } = req.query;
     const id = Math.floor(Math.random() * 10); //meeting ID
     console.log(`Creating meeting: ${id}`);
@@ -23,6 +25,8 @@ app.post("/newMeeting", (req, res) => {
 });
 
 app.post('/checkAttendee', async (req, res) => {
+    // takes in edipi & meetingID params and checks if an attendee meets the access
+    // reqs for the meeting
     try {
         // Check the attendee's EDIPI against the Jira Asset
         const { edipi, meetingID } = req.query;
@@ -55,6 +59,7 @@ app.post('/checkAttendee', async (req, res) => {
 
 
 app.get('/meetings', (req, res) => {
+    // GETs all meetings
     console.log(meetings);
     res.send(meetings);
 });

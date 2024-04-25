@@ -6,7 +6,7 @@ const objectSchemaId = 13; //Schema ID for the asset in Jira
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL; //defined in docker-compose
 
 module.exports = {
-  checkClearance: async function (edipi, meetingObj, res){
+  checkClearance: function (edipi, meetingObj, res){
     return new Promise((resolve, reject) => {
       let config = {
         method: 'get',
