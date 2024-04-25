@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Not Today</string>
+    <string name="barcode_hint">barcode input</string>
+    <string name="set_website">Set Website</string>
+</resources>
