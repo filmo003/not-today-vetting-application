@@ -27,27 +27,25 @@ app.post('/checkAttendee', async (req, res) => {
         // Check the attendee's EDIPI against the Jira Asset
         const { edipi, meetingID } = req.query;
         console.log(`User EDIPI: ${edipi}`);
-
         if (!edipi) {
             return res.status(400).json({ error: "Missing parameter" });
         }
-
         for (const meeting of meetings) {
             if (meeting.meetingID === meetingID) {
                 console.log("Meeting match found");
                 const result = await helper.checkClearance(edipi, meeting, res);
-
+                console.log(result);
                 if (result) {
                     console.log(`Adding user ${edipi} to meeting ID: ${meetingID}`);
                     meeting.attendees.push(edipi);
-                    return res.status(200).json({ message: "User added to meeting" });
-                } else {
+                    return
+                }
+                else {
                     console.log("Deny statement sent in response");
-                    return res.status(403).json({ error: "Access denied" });
+                    return
                 }
             }
         }
-
         return res.status(400).json({ error: "Meeting does not exist" });
     } catch (error) {
         console.error("Error:", error.message);

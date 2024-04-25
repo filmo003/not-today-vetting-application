@@ -22,29 +22,31 @@ module.exports = {
         personObject = response.data.objectEntries[0];
         if (!personObject){
             console.log("No entry found")
-            res.send("No entry found. Deny");
-            return
+            return res.send("No entry found. Deny");
         }
-        // check person's access
-        personName = personObject.label;
-        console.log(`Name = ${personName}`);
-        // iterate through attributes to find "access" attribute
-        for (const attribute of personObject.attributes) {
+        else {
+          // check person's access
+          personName = personObject.label;
+          console.log(`Name = ${personName}`);
+          // iterate through attributes to find "access" attribute
+          for (const attribute of personObject.attributes) {
             if (attribute.id == 414540) { //id of access attribute
-                if (attribute.objectAttributeValues[0].value.includes(meetingObj.meetingClassification)) {
-                    console.log("Correct clearance!");
-                    res.send('\nCorrect Clearance! Admit');
-                    return
-                }
-                res.send('\nIncorrect Clearance, Deny');
-                return
+              if (attribute.objectAttributeValues[0].value.includes(meetingObj.meetingClassification)) {
+                console.log("Correct clearance!");
+                return res.status(200).json({ message: "Correct Clearance, ADMIT" });
+              }
+              else {
+                console.log("Incorrect clearance");
+                return res.status(403).json({ error: "Access denied" });
+              }
             }
+          }
+          return res.status(400).json({ error: "User does not have access attribute" });
         }
-        res.send('something went wrong');
       })
       .catch((error) => {
         console.log(error);
-        return
+        return res.status(500).json({ error: "Internal server error" });
       });
     })
   }
