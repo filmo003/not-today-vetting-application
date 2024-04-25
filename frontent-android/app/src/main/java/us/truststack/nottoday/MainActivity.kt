@@ -15,7 +15,10 @@ import android.util.Log
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -83,16 +86,28 @@ fun JSONObject.toMap(): Map<String, *> = keys().asSequence().associateWith {
 class UserStore(private val context: Context) {
     companion object {
         private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("userToken")
-        private val USER_TOKEN_KEY = stringPreferencesKey("user_token")
+        private val API_URL = stringPreferencesKey("api_url")
+        private val MEETING_ID = stringPreferencesKey("meeting_id")
+
     }
 
-    val getString: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[USER_TOKEN_KEY] ?: ""
+    val getUrl: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[API_URL] ?: ""
     }
 
-    suspend fun saveString(token: String) {
+    suspend fun saveUrl(token: String) {
         context.dataStore.edit { preferences ->
-            preferences[USER_TOKEN_KEY] = token
+            preferences[API_URL] = token
+        }
+    }
+
+    val getID: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[API_URL] ?: ""
+    }
+
+    suspend fun saveID(token: String) {
+        context.dataStore.edit { preferences ->
+            preferences[API_URL] = token
         }
     }
 }
@@ -144,7 +159,9 @@ fun AIToString(at: AttendeeInfo): String {
 }
 
 class MainActivity : AppCompatActivity() {
+    lateinit private var meeting_list: Array<String>
     private var api_url: String = ""
+    private var meeting_id: String = ""
     private lateinit var store: UserStore
     lateinit var barcodeInfo: TextView
     lateinit var cameraView: PreviewView
@@ -175,8 +192,29 @@ class MainActivity : AppCompatActivity() {
 
         val temp = this
         CoroutineScope(Dispatchers.IO).launch {
-            temp.store.getString.collect {
+            temp.store.getUrl.collect {
                 temp.api_url = it
+            }
+            if (temp.api_url != "") {
+                get_meetings(temp.api_url)
+            }
+            temp.store.getID.collect {
+                temp.meeting_id = it
+            }
+        }
+        val spinner = findViewById<Spinner>(R.id.spinner)
+        spinner.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                meeting_id = parent!!.getItemAtPosition(position) as String
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                return
             }
         }
         this.cameraView = findViewById<View>(R.id.camera_view) as PreviewView
@@ -224,7 +262,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun save_url(url: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            store.saveString(url)
+            store.saveUrl(url)
         }
     }
 
@@ -244,7 +282,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 findViewById<TextView>(R.id.idInfo).text = AIToString(at).replace("\\n", "<br/>")
-                lookup(at)
+                lookup(at, meeting_id)
             }
         }
     }
@@ -258,6 +296,23 @@ class MainActivity : AppCompatActivity() {
                 findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.green))
             } else {
                 findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.red))
+            }
+        }
+    }
+
+    fun meeting_list_callback(response: String, res: Int) {
+        val temp = this
+        val result = JSONArray(response)
+        val list = ArrayList<String>()
+        for (i in 0..<result.length()) {
+            list.add(result.getJSONObject(i).getString("meetingID"))
+        }
+
+        if (res == 200) {
+            runOnUiThread {
+                val spinner = findViewById<Spinner>(R.id.spinner)
+                this.meeting_list = list.toTypedArray()
+                spinner.adapter = ArrayAdapter(temp, R.layout.list_item, this.meeting_list)
             }
         }
     }
@@ -300,8 +355,13 @@ class MainActivity : AppCompatActivity() {
     private var client = OkHttpClient()
 
     @Throws(IOException::class)
-    fun get(url: String, edipi: String, meetingID: String) {
-        var u = Uri.parse(url).buildUpon().appendPath("checkAttendee")
+    fun checkAttendee(url: String, edipi: String, meetingID: String) {
+        var scheme = ""
+        if (!url.startsWith("http")) {
+            scheme = "http://"
+        }
+        val urlO = Uri.parse(scheme+url)
+        val u = urlO.buildUpon().appendPath("checkAttendee")
             .appendQueryParameter("edipi", edipi)
             .appendQueryParameter("meetingID", meetingID).build().toString()
         val request: Request = Request.Builder()
@@ -320,10 +380,36 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             })
-
     }
 
-    fun lookup(item: AttendeeInfo?) {
+    @Throws(IOException::class)
+    fun get_meetings(url: String) {
+        var scheme = ""
+        if (!url.startsWith("http")) {
+            scheme = "http://"
+        }
+        val urlO = Uri.parse(scheme+url)
+        Log.println(Log.ERROR, "SCHEME", urlO.scheme!!)
+        val u = urlO.buildUpon().appendPath("meetings")
+            .build().toString()
+        val request: Request = Request.Builder()
+            .url(u)
+            .build()
+        client.newCall(request)
+            .enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    e.printStackTrace()
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        meeting_list_callback(response.body!!.string(), response.code)
+                    }
+                }
+            })
+    }
+
+    fun lookup(item: AttendeeInfo?, meeting_id: String) {
         Log.println(Log.DEBUG, "lookup", item.toString())
         if (item == null) {
             return
@@ -331,7 +417,7 @@ class MainActivity : AppCompatActivity() {
         val e = buildJsonObject {
             put("dodid", JsonPrimitive(item.dodID))
         }
-        get(this.api_url, item.dodID.toString(), "4")
+        checkAttendee(this.api_url, item.dodID.toString(), meeting_id)
     }
 
     private fun disable_scan2key() {
@@ -361,8 +447,12 @@ class MainActivity : AppCompatActivity() {
         builder.setPositiveButton(
             "OK"
         ) { _, _ ->
+            disable_scan2key()
             this.api_url = input.getText().toString()
             save_url(this.api_url)
+            if (this.api_url != "") {
+                get_meetings(this.api_url)
+            }
         }
         builder.setNegativeButton(
             "Cancel"
@@ -373,6 +463,39 @@ class MainActivity : AppCompatActivity() {
         }
         enable_scan2key()
         builder.show()
+        input.requestFocus()
+        input.selectAll()
+    }
+
+    fun set_meeting_id(item: MenuItem) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Meeting ID")
+        val input = EditText(this)
+        input.setInputType(InputType.TYPE_CLASS_TEXT)
+        input.setText(this.meeting_id)
+        builder.setView(input)
+
+        builder.setPositiveButton(
+            "OK"
+        ) { _, _ ->
+            disable_scan2key()
+            val id = input.getText().toString()
+            this.meeting_id = id
+            CoroutineScope(Dispatchers.IO).launch {
+                store.saveID(id)
+            }
+        }
+        builder.setNegativeButton(
+            "Cancel"
+        ) { dialog, _ ->
+            dialog.cancel()
+            disable_scan2key()
+            save_url(this.meeting_id)
+        }
+        enable_scan2key()
+        builder.show()
+        input.requestFocus()
+        input.selectAll()
     }
 
     @SuppressLint("MissingPermission")
@@ -391,6 +514,10 @@ class MainActivity : AppCompatActivity() {
         this.cameraView.visibility = View.GONE
 
         this.cameraSource?.stop()
+    }
+
+    fun refresh_meetings(item: MenuItem) {
+        get_meetings(this.api_url)
     }
 
     private fun get_camera() {

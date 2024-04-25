@@ -19,6 +19,13 @@
         app:menu="@menu/menu"
         app:title="@string/app_name" />
 
+    <Spinner
+        android:id="@+id/spinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:tooltipText="Meeting ID" />
+
     <EditText
         android:id="@+id/etBarCode"
         android:layout_width="match_parent"

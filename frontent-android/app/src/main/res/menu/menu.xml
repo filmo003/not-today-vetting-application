@@ -7,6 +7,12 @@
         android:title="@string/set_website"
         app:showAsAction="always" />
     <item
+        android:onClick="set_meeting_id"
+        android:title="Set Meeting ID" />
+    <item
+        android:onClick="refresh_meetings"
+        android:title="Refresh Meetings" />
+    <item
         android:onClick="start_scanning"
         android:title="Start Scanning"
         android:visible="true" />
