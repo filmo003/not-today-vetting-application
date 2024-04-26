@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -172,7 +173,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraInfo: CameraInfo
     private var cameraSource: CameraXSource? = null
     private lateinit var successPlayer: MediaPlayer
-    private lateinit var failPlayer: MediaPlayer
+    private lateinit var denyPlayer: MediaPlayer
+    private lateinit var sirenPlayer: MediaPlayer
+    private var siren: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -184,7 +187,8 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         successPlayer = MediaPlayer.create(baseContext, R.raw.success)
-        failPlayer = MediaPlayer.create(baseContext, R.raw.success)
+        denyPlayer = MediaPlayer.create(baseContext, R.raw.deny)
+        sirenPlayer = MediaPlayer.create(baseContext, R.raw.siren)
         disable_scan2key()
         val intentFilter = IntentFilter()
         intentFilter.addAction("unitech.scanservice.data")
@@ -318,9 +322,17 @@ class MainActivity : AppCompatActivity() {
     fun result_callback(response: String, res: Int) {
         runOnUiThread {
             this.successPlayer.stop()
-            this.failPlayer.stop()
+            this.successPlayer.release()
             this.successPlayer = MediaPlayer.create(baseContext, R.raw.success)
-            this.failPlayer = MediaPlayer.create(baseContext, R.raw.success)
+            this.successPlayer.setAudioAttributes(AudioAttributes.Builder().setContentType(	AudioAttributes.CONTENT_TYPE_SONIFICATION).setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED).setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
+            this.denyPlayer.stop()
+            this.denyPlayer.release()
+            this.denyPlayer = MediaPlayer.create(baseContext, R.raw.deny)
+            this.denyPlayer.setAudioAttributes(AudioAttributes.Builder().setContentType(	AudioAttributes.CONTENT_TYPE_SONIFICATION).setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED).setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
+            this.sirenPlayer.stop()
+            this.sirenPlayer.release()
+            this.sirenPlayer = MediaPlayer.create(baseContext, R.raw.siren)
+            this.sirenPlayer.setAudioAttributes(AudioAttributes.Builder().setContentType(	AudioAttributes.CONTENT_TYPE_SONIFICATION).setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED).setUsage(AudioAttributes.USAGE_NOTIFICATION).build())
             var result: Map<String, *>? = null
             try {
                 result = JSONObject(response).toMap()
@@ -345,9 +357,19 @@ class MainActivity : AppCompatActivity() {
             } else {
                 if (res == 403) {
                     if (result.contains("error") && result["error"] == "No entry found. Deny") {
+                        Toast.makeText(
+                            this,
+                            "Error: ${result["error"]}",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                        this.denyPlayer.start()
+                        barcodeInfo.text =
+                            "${barcodeInfo.text}\nerror: ${result.getOrDefault("error", "fail")}"
+                        return@runOnUiThread
                     } else {
                         findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.red))
+                        this.denyPlayer.start()
                         return@runOnUiThread
                     }
                 }
@@ -358,6 +380,9 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
                     findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                    if (this.siren) {
+                        this.sirenPlayer.start()
+                    }
                     barcodeInfo.text =
                         "${barcodeInfo.text}\nerror: ${result.getOrDefault("error", "fail")}"
                     return@runOnUiThread
@@ -634,6 +659,10 @@ class MainActivity : AppCompatActivity() {
         this.cameraView.visibility = View.GONE
 
         this.cameraSource?.stop()
+    }
+
+    fun toggle_siren(item: MenuItem) {
+        this.siren = !this.siren
     }
 
     fun refresh_meetings(item: MenuItem) {
