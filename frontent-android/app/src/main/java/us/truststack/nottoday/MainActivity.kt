@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -14,7 +15,6 @@ import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
@@ -71,16 +71,15 @@ import java.lang.Integer.parseInt
 import java.util.concurrent.TimeUnit
 
 fun JSONObject.toMap(): Map<String, *> = keys().asSequence().associateWith {
-    when (val value = this[it])
-    {
-        is JSONArray ->
-        {
+    when (val value = this[it]) {
+        is JSONArray -> {
             val map = (0 until value.length()).associate { Pair(it.toString(), value[it]) }
             JSONObject(map).toMap().values.toList()
         }
+
         is JSONObject -> value.toMap()
         JSONObject.NULL -> null
-        else            -> value
+        else -> value
     }
 }
 
@@ -160,7 +159,7 @@ fun AIToString(at: AttendeeInfo): String {
 }
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var meeting_list: Array<String>
+    private var meeting_list: Array<String> = Array(0, { "" })
     private var api_url: String = ""
     private var meeting_id: String = ""
     private lateinit var store: UserStore
@@ -172,6 +171,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraControl: CameraControl
     private lateinit var cameraInfo: CameraInfo
     private var cameraSource: CameraXSource? = null
+    private lateinit var successPlayer: MediaPlayer
+    private lateinit var failPlayer: MediaPlayer
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -181,6 +183,8 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        successPlayer = MediaPlayer.create(baseContext, R.raw.success)
+        failPlayer = MediaPlayer.create(baseContext, R.raw.success)
         disable_scan2key()
         val intentFilter = IntentFilter()
         intentFilter.addAction("unitech.scanservice.data")
@@ -195,16 +199,18 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             temp.store.getUrl.collect {
                 temp.api_url = it
+                if (temp.api_url != "") {
+                    get_meetings(temp.api_url)
+                }
             }
-            if (temp.api_url != "") {
-                get_meetings(temp.api_url)
-            }
+
             temp.store.getID.collect {
                 temp.meeting_id = it
             }
         }
         val spinner = findViewById<Spinner>(R.id.spinner)
-        spinner.onItemSelectedListener = object: AdapterView.OnItemSelectedListener{
+        spinner.setSelection(meeting_list.indexOf(meeting_id))
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,
                 view: View?,
@@ -226,8 +232,10 @@ class MainActivity : AppCompatActivity() {
         }
         val te = findViewById<EditText>(R.id.etBarCode)
         te.setOnKeyListener { v, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_ENTER) {
-                val barcode = intent.getStringExtra("text")
+            Log.println(Log.ERROR, "KEYCODE", keyCode.toString())
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP) {
+                barcodeInfo.text = ""
+                val barcode = te.text.toString()
                 if (barcode == null) {
                     return@setOnKeyListener true
                 }
@@ -267,7 +275,7 @@ class MainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
-                    get_camera()
+                get_camera()
             } else {
                 Toast.makeText(
                     this,
@@ -309,23 +317,84 @@ class MainActivity : AppCompatActivity() {
 
     fun result_callback(response: String, res: Int) {
         runOnUiThread {
-            val result = JSONObject(response).toMap()
-            barcodeInfo.text =
-                "${barcodeInfo.text}\nresponse: ${result.getOrDefault("message", "fail")}"
+            this.successPlayer.stop()
+            this.failPlayer.stop()
+            this.successPlayer = MediaPlayer.create(baseContext, R.raw.success)
+            this.failPlayer = MediaPlayer.create(baseContext, R.raw.success)
+            var result: Map<String, *>? = null
+            try {
+                result = JSONObject(response).toMap()
+                Log.println(Log.ERROR, "RESULT", result.toString())
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this,
+                    "Unknown error",
+                    Toast.LENGTH_SHORT
+                ).show()
+                findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                Log.println(Log.ERROR, "RESULT-ST", e.stackTrace.toString())
+                return@runOnUiThread
+            }
             if (res == 200) {
+                Log.println(Log.ERROR, "RESULT-SUCCESS", "${barcodeInfo.text}")
+                barcodeInfo.text =
+                    "${barcodeInfo.text}\nresponse: ${result.getOrDefault("message", "fail")}"
                 findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.green))
+                this.successPlayer.start()
+                return@runOnUiThread
             } else {
-                findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.red))
+                if (res == 403) {
+                    if (result.contains("error") && result["error"] == "No entry found. Deny") {
+                        findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                    } else {
+                        findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.red))
+                        return@runOnUiThread
+                    }
+                }
+                if (result.contains("error")) {
+                    Toast.makeText(
+                        this,
+                        "Error: ${result["error"]}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                    barcodeInfo.text =
+                        "${barcodeInfo.text}\nerror: ${result.getOrDefault("error", "fail")}"
+                    return@runOnUiThread
+                }
             }
         }
     }
 
     fun meeting_list_callback(response: String, res: Int) {
         val temp = this
-        val result = JSONArray(response)
         val list = ArrayList<String>()
-        for (i in 0..<result.length()) {
-            list.add(result.getJSONObject(i).getString("meetingID"))
+        try {
+            val result = JSONObject(response).getJSONArray("objectEntries")
+            for (i in 0..<result.length()) {
+
+                var tmp = result.getJSONObject(i).getJSONArray("attributes")
+                for (x in 0..<tmp.length()) {
+                    val obj = tmp.getJSONObject(x)
+                    if (obj.getString("objectTypeAttributeId") == "1951") {
+                        list.add(
+                            obj.getJSONArray("objectAttributeValues").getJSONObject(0)
+                                .getString("value")
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            runOnUiThread {
+                Toast.makeText(
+                    temp,
+                    "Failed to retrieve meeting list",
+                    Toast.LENGTH_SHORT
+                ).show()
+                Log.println(Log.ERROR, "MEETING", "$e ${e.stackTrace}")
+                findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+            }
+            return
         }
 
         if (res == 200) {
@@ -333,6 +402,7 @@ class MainActivity : AppCompatActivity() {
                 val spinner = findViewById<Spinner>(R.id.spinner)
                 this.meeting_list = list.toTypedArray()
                 spinner.adapter = ArrayAdapter(temp, R.layout.list_item, this.meeting_list)
+                spinner.setSelection(this.meeting_list.indexOf(this.meeting_id))
             }
         }
     }
@@ -380,7 +450,7 @@ class MainActivity : AppCompatActivity() {
         if (!url.startsWith("http")) {
             scheme = "http://"
         }
-        val urlO = Uri.parse(scheme+url)
+        val urlO = Uri.parse(scheme + url)
         val u = urlO.buildUpon().appendPath("checkAttendee")
             .appendQueryParameter("edipi", edipi)
             .appendQueryParameter("meetingID", meetingID).build().toString()
@@ -388,10 +458,19 @@ class MainActivity : AppCompatActivity() {
             .post("".toRequestBody("application/json".toMediaType()))
             .url(u)
             .build()
+        val temp = this
         client.newCall(request)
             .enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     e.printStackTrace()
+                    runOnUiThread {
+                        Toast.makeText(
+                            temp,
+                            "Failed to Check meeting attendee",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                    }
                 }
 
                 override fun onResponse(call: Call, response: Response) {
@@ -408,21 +487,37 @@ class MainActivity : AppCompatActivity() {
         if (!url.startsWith("http")) {
             scheme = "http://"
         }
-        val urlO = Uri.parse(scheme+url)
+        val urlO = Uri.parse(scheme + url)
         Log.println(Log.ERROR, "SCHEME", urlO.scheme!!)
         val u = urlO.buildUpon().appendPath("meetings")
             .build().toString()
         val request: Request = Request.Builder()
             .url(u)
             .build()
+        val temp = this
         client.newCall(request)
             .enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     e.printStackTrace()
+                    runOnUiThread {
+                        Toast.makeText(
+                            temp,
+                            "Unable to retrieve meeting list",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
+                    }
                 }
 
                 override fun onResponse(call: Call, response: Response) {
                     response.use {
+                        runOnUiThread {
+                            Toast.makeText(
+                                temp,
+                                "Retrieved meeting list",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                         meeting_list_callback(response.body!!.string(), response.code)
                     }
                 }
@@ -437,6 +532,7 @@ class MainActivity : AppCompatActivity() {
         val e = buildJsonObject {
             put("dodid", JsonPrimitive(item.dodID))
         }
+
         checkAttendee(this.api_url, item.dodID.toString(), meeting_id)
     }
 
@@ -501,6 +597,8 @@ class MainActivity : AppCompatActivity() {
             disable_scan2key()
             val id = input.getText().toString()
             this.meeting_id = id
+            val spinner = findViewById<Spinner>(R.id.spinner)
+            spinner.setSelection(this.meeting_list.indexOf(this.meeting_id))
             CoroutineScope(Dispatchers.IO).launch {
                 store.saveID(id)
             }
@@ -510,7 +608,9 @@ class MainActivity : AppCompatActivity() {
         ) { dialog, _ ->
             dialog.cancel()
             disable_scan2key()
-            save_url(this.meeting_id)
+            CoroutineScope(Dispatchers.IO).launch {
+                store.saveID(meeting_id)
+            }
         }
         enable_scan2key()
         builder.show()
@@ -522,8 +622,8 @@ class MainActivity : AppCompatActivity() {
     fun start_scanning(item: MenuItem) {
         if (allPermissionsGranted()) {
             this.cameraView.visibility = View.VISIBLE
-                get_camera()
-                cameraSource!!.start()
+            get_camera()
+            cameraSource!!.start()
         } else {
             request_permissions()
             start_scanning(item)
