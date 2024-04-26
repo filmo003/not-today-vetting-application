@@ -41,7 +41,7 @@ module.exports = {
             console.log("user missing access attribute");
             return res.status(400).json({ error: "User does not have access attribute" })
           }
-          // ~~~~~ get meeting object ID from Jira based on meetingID ~~~~
+          // get meeting object ID from Jira based on meetingID
           let getMeetingConfig = {
             method: 'get',
             url: `${JIRA_BASE_URL}/rest/assets/latest/aql/objects?objectSchemaId=${objectSchemaId}&qlQuery=meetingID LIKE "${meetingID}"`,
@@ -62,11 +62,12 @@ module.exports = {
             var attendees = "";
             //console.log(`Meeting: ${meeting}`);
             for (const attribute of meeting.attributes){
-              console.log(`checking attribute: ${attribute.objectAttributeValues[0].value}`);
+              //console.log(`checking attribute: ${attribute.objectAttributeValues[0].value}`);
               if (attribute.objectTypeAttributeId == 1951 && attribute.objectAttributeValues[0].value == meetingID){ // check if we're on the meetingID attribute AND that the meetingID sent matches
                 console.log("found meeting, checking clearance");
                 for (const attribute2 of meeting.attributes){
                   if (attribute2.objectTypeAttributeId == 1952 && !(userAccessLevel.includes(attribute2.objectAttributeValues[0].value))){ // check if we're on the access attribute & req access is NOT in user's access level
+                    // note, this is not the right way to check the Clearance strings, it just happens to work in this scenario
                     console.log("User access does not meet meeting access level");
                     console.log(`Meeting needs at least: ${attribute2.objectAttributeValues[0].value}`);
                     console.log(`User has: ${userAccessLevel}`);
@@ -83,7 +84,7 @@ module.exports = {
             if (addUser){
               console.log("Correct clearance!");
               console.log(`Adding user to meetingID:${meetingID}`)
-              const newAttendees = attendees + edipi + '\n'; // concat new edipi to the list
+              const newAttendees = attendees + edipi + ','; // concat new edipi to the list
               console.log(`New Attendance list is: ${newAttendees}`);
               let data = JSON.stringify({
                 "objectTypeId": 208, //identifies it as a meeting object
