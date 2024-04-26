@@ -15,7 +15,7 @@ services:
       - BACKEND_API=http://backend:3000
   backend:
     build:
-      context: ./backend-nodejs
+      context: ./backend
       dockerfile: backend.dockerfile
     volumes:
       - '.:/project'
