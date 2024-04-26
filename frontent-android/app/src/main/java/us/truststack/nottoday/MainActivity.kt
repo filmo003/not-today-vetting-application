@@ -363,13 +363,21 @@ class MainActivity : AppCompatActivity() {
                             Toast.LENGTH_SHORT
                         ).show()
                         findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
-                        this.denyPlayer.start()
+                        if (this.siren) {
+                            this.sirenPlayer.start()
+                        } else {
+                            this.denyPlayer.start()
+                        }
                         barcodeInfo.text =
                             "${barcodeInfo.text}\nerror: ${result.getOrDefault("error", "fail")}"
                         return@runOnUiThread
                     } else {
                         findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.red))
-                        this.denyPlayer.start()
+                        if (this.siren) {
+                            this.sirenPlayer.start()
+                        } else {
+                            this.denyPlayer.start()
+                        }
                         return@runOnUiThread
                     }
                 }
@@ -381,6 +389,8 @@ class MainActivity : AppCompatActivity() {
                     ).show()
                     findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.yellow))
                     if (this.siren) {
+                        this.denyPlayer.start()
+                    } else {
                         this.sirenPlayer.start()
                     }
                     barcodeInfo.text =
