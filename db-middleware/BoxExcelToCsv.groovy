@@ -57,7 +57,7 @@ def xlsxToCsv(String xlsxPath, String csvPath) {
                 Cell cell = it.next()
                 out.print(formatter.formatCellValue(cell))
                 if (it.hasNext()) {
-                    out.print(',')
+                    out.print(';')
                 }
             }
         }

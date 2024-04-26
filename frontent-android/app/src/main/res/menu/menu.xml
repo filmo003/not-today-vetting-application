@@ -20,4 +20,7 @@
         android:onClick="stop_scanning"
         android:title="Stop Scanning"
         android:visible="true" />
+    <item
+        android:onClick="toggle_siren"
+        android:title="Toggle Siren" />
 </menu>
