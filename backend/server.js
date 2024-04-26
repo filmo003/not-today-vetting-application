@@ -1,11 +1,11 @@
 // server.js
 const express = require('express');
-const session = require('express-session');
+//const session = require('express-session');
 const app = express();
 const port = 3000; // Choose any available port
 const helper = require('./helperFunctions')
 
-app.use(session({secret: 'sample secret', resave: true, saveUninitialized: true}))
+//app.use(session({secret: 'sample secret', resave: true, saveUninitialized: true}))
 
 var meetings = [];
 

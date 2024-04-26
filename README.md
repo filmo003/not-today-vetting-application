@@ -1,51 +1,21 @@
 # not-today-vetting-application
-Vetting application for the SLD 45 Data Derby
-
-
-# Example data
-Front barcode:
-```plain
-M1E46E0B01I1UJGGGeoffrey            SWelch                     B41TUS ED00      ZZNSZBD0CBE2ATPEAH4
-```
-
-Parsed:
-```plain
-version: M
-DOD_ID: 1547909131
-UNKNOWN: 01I1UJGG
-first_name: Geoffrey
-m_initial: S
-last_name: Welch
-UNKNOWN: B41TUS ED00      ZZNSZBD0CBE2A
-CSID: 999762468
-
-```
-
-Back barcode:
-```plain
-1TPEAH4X1E46E0BEDZ
-```
-
-Parsed:
-```plain
-version: 1
-CSID: 999762468
-person_type: X
-DOD_ID: 1547909131
-person_category: E
-branch: D
-card_id: Z
-
-```
+Vetting application for the 2024 SLD 45 Data Derby
+Application is designed to utilize handheld barcode scanners to scan a form of identification and compare that to a Jira Asset Database where a user's access level can be vetted against a meeting's access requirements.
 
 # Frontend
-`/frontend` contains the web frontend.
+`/frontend` contains a sample web frontend.
 It is a single form with one text input element. When the user scans a barcode, it is typed into the field.
 
-Once the backend is stood up, the DOD ID can be sent to the backend and either validated or rejected. The entire UX is one button, and the UI turning green or red based.
+Once the backend is stood up, the ID can be sent to the backend and either validated or rejected. The entire UX is one button, and the UI turning green or red based.
+
+# Backend
+`/backend` contains the backend API server for communicating from the frontend/android app and checking against a Jira assets defined by the `JIRA_BASE_URL` variable in the `docker-compose.yml` file.
+
+# DB-Middleware
+`/db-middleware` contians the scripting necessarry for automatically converting an xls file to CSV, and pushing to a predefined BOX folder endpoint.
 
 ## Deployment
-Before running, run `echo "your_jira_api_token" | docker secret create JIRA_API_TOKEN -` this will allow the backend to talk to your Jira instance.
+Before running, create `jira_secret.txt` in the root directory and populate with you Jira API token. This populates the Docker `JIRA_API_TOKEN` secret and will allow the backend to talk to your Jira instance.
 
 `docker compose up` deploys the web server frontend and backend.
 
