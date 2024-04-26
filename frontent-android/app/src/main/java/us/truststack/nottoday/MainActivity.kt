@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.text.InputType
 import android.util.Log
+import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
@@ -102,12 +103,12 @@ class UserStore(private val context: Context) {
     }
 
     val getID: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[API_URL] ?: ""
+        preferences[MEETING_ID] ?: ""
     }
 
     suspend fun saveID(token: String) {
         context.dataStore.edit { preferences ->
-            preferences[API_URL] = token
+            preferences[MEETING_ID] = token
         }
     }
 }
@@ -159,18 +160,18 @@ fun AIToString(at: AttendeeInfo): String {
 }
 
 class MainActivity : AppCompatActivity() {
-    lateinit private var meeting_list: Array<String>
+    private lateinit var meeting_list: Array<String>
     private var api_url: String = ""
     private var meeting_id: String = ""
     private lateinit var store: UserStore
-    lateinit var barcodeInfo: TextView
-    lateinit var cameraView: PreviewView
-    lateinit var cameraController: LifecycleCameraController
-    lateinit var processCameraProvider: ProcessCameraProvider
-    lateinit var camera: Camera
-    lateinit var cameraControl: CameraControl
-    lateinit var cameraInfo: CameraInfo
-    var cameraSource: CameraXSource? = null
+    private lateinit var barcodeInfo: TextView
+    private lateinit var cameraView: PreviewView
+    private lateinit var cameraController: LifecycleCameraController
+    private lateinit var processCameraProvider: ProcessCameraProvider
+    private lateinit var camera: Camera
+    private lateinit var cameraControl: CameraControl
+    private lateinit var cameraInfo: CameraInfo
+    private var cameraSource: CameraXSource? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -222,6 +223,25 @@ class MainActivity : AppCompatActivity() {
         this.cameraView.visibility = View.GONE
         if (allPermissionsGranted()) {
             get_camera()
+        }
+        val te = findViewById<EditText>(R.id.etBarCode)
+        te.setOnKeyListener { v, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_ENTER) {
+                val barcode = intent.getStringExtra("text")
+                if (barcode == null) {
+                    return@setOnKeyListener true
+                }
+                te.setText(barcode)
+                val at = parseBarcode(barcode)
+                if (at == null) {
+                    Log.println(Log.WARN, "scanner", "Unable to parse barcode: $barcode")
+                    return@setOnKeyListener true
+                }
+                this.barcodeInfo.text = AIToString(at).replace("\\n", "<br/>")
+                lookup(at, meeting_id)
+                return@setOnKeyListener true
+            }
+            return@setOnKeyListener false
         }
     }
 
@@ -290,8 +310,8 @@ class MainActivity : AppCompatActivity() {
     fun result_callback(response: String, res: Int) {
         runOnUiThread {
             val result = JSONObject(response).toMap()
-            findViewById<TextView>(R.id.idInfo).text =
-                findViewById<TextView>(R.id.idInfo).text.toString() + "\nresponse: ${result.getOrDefault("message", "fail")}"
+            barcodeInfo.text =
+                "${barcodeInfo.text}\nresponse: ${result.getOrDefault("message", "fail")}"
             if (res == 200) {
                 findViewById<View>(R.id.main).setBackgroundColor(resources.getColor(R.color.green))
             } else {
@@ -525,7 +545,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val future = ProcessCameraProvider.getInstance(baseContext)
-        future.addListener(Runnable {
+        future.addListener({
             this.processCameraProvider = future.get()
             this.camera =
                 processCameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA)
@@ -563,25 +583,21 @@ class MainActivity : AppCompatActivity() {
             cameraView.height.toFloat()
         )
         val temp = this
-        cameraView.setOnTouchListener(object : View.OnTouchListener {
-            override fun onTouch(v: View, event: MotionEvent): Boolean {
-                val meteringPoint = cameraView.meteringPointFactory
-                    .createPoint(event.x, event.y)
-                val action = FocusMeteringAction.Builder(meteringPoint) // default AF|AE|AWB
-                    // The action is canceled in 3 seconds (if not set, default is 5s).
-                    .setAutoCancelDuration(3, TimeUnit.SECONDS)
-                    .build()
+        cameraView.setOnTouchListener { _, event ->
+            val meteringPoint = cameraView.meteringPointFactory
+                .createPoint(event.x, event.y)
+            val action = FocusMeteringAction.Builder(meteringPoint) // default AF|AE|AWB
+                // The action is canceled in 3 seconds (if not set, default is 5s).
+                .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                .build()
 
-                val result = cameraControl.startFocusAndMetering(action)
-// Adds listener to the ListenableFuture if you need to know the focusMetering result.
-                result.addListener({
-                    // result.get().isFocusSuccessful returns if the auto focus is successful or not.
-                }, ContextCompat.getMainExecutor(temp))
-                return false
-            }
-
-        })
-
+            val result = cameraControl.startFocusAndMetering(action)
+            // Adds listener to the ListenableFuture if you need to know the focusMetering result.
+            result.addListener({
+                // result.get().isFocusSuccessful returns if the auto focus is successful or not.
+            }, ContextCompat.getMainExecutor(temp))
+            false
+        }
 
         val meteringPoint1 = meteringPointFactory.createPoint(
             cameraView.width.toFloat() / 2,
@@ -602,7 +618,7 @@ class MainActivity : AppCompatActivity() {
 }
 
 class detector(barcodeInfo: TextView) : DetectionTaskCallback<List<Barcode>> {
-    val bcode = barcodeInfo
+    private val bcode = barcodeInfo
     override fun onDetectionTaskReceived(task: Task<List<Barcode>>) {
         task.addOnSuccessListener { barcodeList ->
             for (x in barcodeList) {
