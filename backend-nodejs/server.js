@@ -1,64 +1,62 @@
 // server.js
 const express = require('express');
+const session = require('express-session');
 const app = express();
 const port = 3000; // Choose any available port
-const axios = require('axios').default;
-const objectSchemaId = 13 //Schema ID for the asset in Jira
-const fs = require('fs');
-const JIRA_API_TOKEN = fs.readFileSync('/run/secrets/JIRA_API_TOKEN', 'utf8').trim();
-const JIRA_BASE_URL = process.env.JIRA_BASE_URL; //defined in docker-compose
+const helper = require('./helperFunctions')
 
-//import jiraClient from './jiraClient';
+app.use(session({secret: 'sample secret', resave: true, saveUninitialized: true}))
+
+var meetings = [];
 
 app.get('/', (req, res) => {
     res.send('\nHello from the not-today backend!');
 });
 
-app.get('/checkAttendeeSecret', (req, res) => {
-    // check the attendee's edipi against the Jira Asset
-    const { edipi } = req.query;
-    console.log(`User EDIPI: ${edipi}`);
-    if (!edipi) {
-        return res.status(400).json({ error: "need edipi"})
+app.post("/newMeeting", (req, res) => {
+    // takes in title & classificaiton params and creates new meeting
+    // returns unique meeting ID
+    try{
+        const { title, classLevel } = req.query;
+        const id = Math.floor(Math.random() * 10); //meeting ID
+        console.log(`Creating meeting: ${id}`);
+        //const newMeeting = {meetingID:`${id}`, meetingTitle:title, attendees: [], meetingClassification:classLevel};
+        helper.createMeeting(id, title, classLevel, res);
+        //meetings.push(newMeeting);
+        //res.status(201).json(newMeeting);
+    }catch (error) {
+        console.error("Error:", error.message);
+        return res.status(500).json({ error: "Internal server error" });
     }
-    let config = {
-        method: 'get',
-        maxBodyLength: Infinity,
-        url: `https://jira.truststack.us/rest/assets/1.0/aql/objects?objectSchemaId=${objectSchemaId}&qlQuery=EDIPI LIKE "${edipi}"`,
-        headers: {  
-            "Authorization" : `Bearer ${JIRA_API_TOKEN}`
+});
+
+app.post('/checkAttendee', async (req, res) => {
+    // takes in edipi & meetingID params and checks if an attendee meets the access
+    // reqs for the meeting
+    try {
+        // Check the attendee's EDIPI against the Jira Asset
+        const { edipi, meetingID } = req.query;
+        console.log(`User EDIPI: ${edipi}`);
+        if (!edipi) {
+            return res.status(400).json({ error: "Missing parameter" });
         }
-    };
-    
-    axios.request(config)
-    .then((response) => {
-        const responseString = JSON.stringify(response.data);
-        personObject = response.data.objectEntries[0];
-        if (!personObject){
-            console.log("No entry found")
-            res.send("No entry found. Deny");
-            return
-        }
-        // check person's access is at least secret
-        personName = personObject.label;
-        console.log(`Name = ${personName}`);
-        // iterate through attributes to find "access" attribute
-        for (const attribute of personObject.attributes) {
-            if (attribute.id == 414540) { //id of access attribute
-                if (attribute.objectAttributeValues[0].value.includes("Secret")) {
-                    console.log("Correct clearance!");
-                    res.send('\nCorrect Clearance! Admit');
-                    return
-                }
-                res.send('\nIncorrect Clearance, Deny');
-                return
-            }
-        }
-        res.send('something went wrong');
-    })
-    .catch((error) => {
-        console.log(error);
-    });
+        helper.checkClearance(edipi, meetingID, res);
+    } catch (error) {
+        console.error("Error:", error.message);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+});
+
+app.get('/meetingWithID', (req, res) => {
+    const { meetingID } = req.query;
+    helper.getMeetingWithID(res);
+});
+
+app.get('/meetings', (req, res) => {
+    // GETs all meetings
+    //console.log(meetings);
+    //res.send(meetings);
+    helper.getMeetings(res);
 });
 
 app.listen(port, () => {
